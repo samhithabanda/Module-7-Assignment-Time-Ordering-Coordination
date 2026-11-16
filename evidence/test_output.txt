@@ -1,0 +1,9 @@
+test_stale_worker_rejected (test_order_sim.FencingTests.test_stale_worker_rejected) ... ok
+test_duplicate_while_buffered (test_order_sim.OrderingTests.test_duplicate_while_buffered) ... ok
+test_missing_event_does_not_jump_ahead (test_order_sim.OrderingTests.test_missing_event_does_not_jump_ahead) ... ok
+test_out_of_order_and_duplicate (test_order_sim.OrderingTests.test_out_of_order_and_duplicate) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.000s
+
+OK

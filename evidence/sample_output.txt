@@ -1,0 +1,66 @@
+
+========================================================================
+TEST 1: Versioned ordering + duplicates  (delivery: v2, v1, v2 again, v3)
+========================================================================
+  [RECEIVE  ] order=A100 v2 PAID  (current: v0 NONE)
+  [PENDING  ] v2 buffered; waiting for missing [1]
+  [RECEIVE  ] order=A100 v1 CREATED  (current: v0 NONE)
+  [APPLY    ] order=A100 NONE -> CREATED (now v1)
+  [UNBUFFER ] gap filled, applying buffered v2
+  [APPLY    ] order=A100 CREATED -> PAID (now v2)
+  [RECEIVE  ] order=A100 v2 PAID  (current: v2 PAID)
+  [DUPLICATE] v2 already applied -> ignored
+  [RECEIVE  ] order=A100 v3 SHIPPED  (current: v2 PAID)
+  [APPLY    ] order=A100 PAID -> SHIPPED (now v3)
+  [RECEIVE  ] order=A100 v3 SHIPPED  (current: v3 SHIPPED)
+  [DUPLICATE] v3 already applied -> ignored
+
+  RESULT: order=A100 version=3 status=SHIPPED history=['v1:CREATED', 'v2:PAID', 'v3:SHIPPED'] pending=[] missing=[]
+  RESULT: duplicates ignored = 2
+
+========================================================================
+TEST 2: Missing event  (v1 arrives, v2 is lost, v3 arrives)
+========================================================================
+  [RECEIVE  ] order=B200 v1 CREATED  (current: v0 NONE)
+  [APPLY    ] order=B200 NONE -> CREATED (now v1)
+  [RECEIVE  ] order=B200 v3 SHIPPED  (current: v1 CREATED)
+  [PENDING  ] v3 buffered; waiting for missing [2]
+
+  STATE : order=B200 version=1 status=CREATED history=['v1:CREATED'] pending=[3] missing=[2]
+  -> order stays CREATED; it did NOT jump ahead to SHIPPED
+  [TIMEOUT  ] order=B200 still missing [2]; pending=[3] -> request retransmission
+
+  ... retransmission of v2 finally arrives ...
+  [RECEIVE  ] order=B200 v2 PAID  (current: v1 CREATED)
+  [APPLY    ] order=B200 CREATED -> PAID (now v2)
+  [UNBUFFER ] gap filled, applying buffered v3
+  [APPLY    ] order=B200 PAID -> SHIPPED (now v3)
+
+  RESULT: order=B200 version=3 status=SHIPPED history=['v1:CREATED', 'v2:PAID', 'v3:SHIPPED'] pending=[] missing=[]
+
+========================================================================
+TEST 3: Stale worker with fencing tokens
+========================================================================
+  [LOCK     ] worker-1 acquired lease on C300 with fencing token 1
+  [WORKER   ] worker-1 tries to set C300 -> PAID using token 1
+  [WRITE    ] worker-1 token=1 OK: C300 NONE -> PAID
+  [PAUSE    ] worker-1 freezes (long GC pause / network partition)
+  [LOCK     ] lease held by worker-1 on C300 EXPIRED
+  [LOCK     ] worker-2 acquired lease on C300 with fencing token 2
+  [WORKER   ] worker-2 tries to set C300 -> SHIPPED using token 2
+  [WRITE    ] worker-2 token=2 OK: C300 PAID -> SHIPPED
+  [RESUME   ] worker-1 wakes up, still believes it holds the lease
+  [WORKER   ] worker-1 tries to set C300 -> PAID using token 1
+  [REJECT   ] worker-1 token=1 < highest seen 2 -> stale write 'PAID' rejected
+
+  RESULT: C300 status=SHIPPED highest_token=2
+
+========================================================================
+BONUS: Why timestamps alone fail  (clock skew between two nodes)
+========================================================================
+  [EVENT    ] node-1 wall-clock ts=1000.0  v1 CREATED
+  [EVENT    ] node-2 wall-clock ts=997.0  v2 PAID
+  [SORT     ] ordered by timestamp -> ['PAID', 'CREATED']   (WRONG: PAID before CREATED)
+  [SORT     ] ordered by version   -> ['CREATED', 'PAID']   (correct)
+
+All scenarios finished.
