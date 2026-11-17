@@ -16,6 +16,7 @@ Events can arrive **late**, **out of order**, or **more than once**, and two wor
 | `test_order_sim.py` | Unit tests for each requirement |
 | `evidence/sample_output.txt` | Full terminal output of `python3 order_sim.py` |
 | `evidence/test_output.txt` | Terminal output of the unit test run |
+| `screenshots/` | Terminal screenshots of each test scenario and the unit tests |
 
 ## How to run
 
@@ -48,7 +49,7 @@ For the stale-worker problem, a `LockService` gives each lease a **fencing token
 
 ## Evidence
 
-The terminal output below was captured from `python3 order_sim.py`. The same output is in [`evidence/sample_output.txt`](evidence/sample_output.txt).
+Each section below has a terminal screenshot (in [`screenshots/`](screenshots)) followed by the same output as text. Everything comes from running `python3 order_sim.py` and `python3 -m unittest -v test_order_sim`. The complete raw logs are in [`evidence/`](evidence).
 
 ### 1. Correct event ordering + duplicate handling
 
@@ -58,6 +59,10 @@ Delivery order is **v2, v1, v2 again** (then v3 and another v3 duplicate).
 * v1 arrives and is applied, and then the buffered v2 is applied right after it.
 * The re-delivered v2 is detected as a **duplicate and ignored**.
 * Final history is `v1 -> v2 -> v3` with 2 duplicates ignored.
+
+![Test 1: ordering and duplicates](screenshots/01_ordering_and_duplicates.png)
+
+Text version of the same output:
 
 ```
 ========================================================================
@@ -88,6 +93,10 @@ Only v1 and v3 are sent, so v2 is missing.
 * v3 is recorded as `pending=[3]` and the gap is recorded as `missing=[2]`.
 * After the timeout the missing version is reported and a retransmission is requested. When v2 finally arrives, both v2 and v3 are applied in order.
 
+![Test 2: missing event](screenshots/02_missing_event.png)
+
+Text version of the same output:
+
 ```
 ========================================================================
 TEST 2: Missing event  (v1 arrives, v2 is lost, v3 arrives)
@@ -116,6 +125,10 @@ TEST 2: Missing event  (v1 arrives, v2 is lost, v3 arrives)
 * `worker-1` pauses, its lease expires, and `worker-2` gets token **2** and writes SHIPPED.
 * `worker-1` wakes up and tries to write using token 1. The store has already seen token 2, so the write is **rejected**.
 
+![Test 3: stale worker rejected](screenshots/03_stale_worker.png)
+
+Text version of the same output:
+
 ```
 ========================================================================
 TEST 3: Stale worker with fencing tokens
@@ -139,6 +152,10 @@ TEST 3: Stale worker with fencing tokens
 
 Here node-2's clock runs 5 seconds behind. The PAID event really happened after CREATED, but its timestamp is earlier.
 
+![Bonus: timestamp skew](screenshots/04_timestamp_skew.png)
+
+Text version of the same output:
+
 ```
 ========================================================================
 BONUS: Why timestamps alone fail  (clock skew between two nodes)
@@ -150,6 +167,10 @@ BONUS: Why timestamps alone fail  (clock skew between two nodes)
 ```
 
 ### Unit tests
+
+![Unit tests passing](screenshots/05_unit_tests.png)
+
+Text version of the same output:
 
 ```
 test_stale_worker_rejected (test_order_sim.FencingTests.test_stale_worker_rejected) ... ok
